@@ -1,0 +1,29 @@
+{
+  "name": "udonarium-backend",
+  "version": "1.0.0",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "all:build": "npm run build -ws --if-present",
+    "aws-lambda:build": "npm run build -w @udonarium-backend/aws-lambda",
+    "aws-lambda:dev": "npm run dev -w @udonarium-backend/aws-lambda",
+    "aws-lambda:zip": "npm run zip -w @udonarium-backend/aws-lambda",
+    "aws-lambda:update": "npm run update -w @udonarium-backend/aws-lambda",
+    "aws-lambda:deploy": "npm run deploy -w @udonarium-backend/aws-lambda",
+    "cloudflare-workers:build": "npm run build -w @udonarium-backend/cloudflare-workers",
+    "cloudflare-workers:dev": "npm run dev -w @udonarium-backend/cloudflare-workers",
+    "cloudflare-workers:deploy": "npm run deploy -w @udonarium-backend/cloudflare-workers",
+    "nodejs:build": "npm run build -w @udonarium-backend/nodejs",
+    "nodejs:dev": "npm run dev -w @udonarium-backend/nodejs"
+  },
+  "dependencies": {
+    "hono": "^4.5.9"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2"
+  },
+  "workspaces": [
+    "packages/backend/*",
+    "packages/shared/*"
+  ]
+}

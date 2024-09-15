@@ -1,0 +1,21 @@
+{
+  "name": "@udonarium-backend/aws-lambda",
+  "version": "1.0.0",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch --env-file=.env --env-file=.env.local src/index.ts",
+    "build": "esbuild --bundle --minify --outfile=../../../dist/aws-lambda/index.js --platform=node --target=node20 ./src/index.ts",
+    "zip": "zip -j ../../../dist/aws-lambda/lambda.zip ../../../dist/aws-lambda/index.js",
+    "update": "aws lambda update-function-code --zip-file fileb://../../../dist/aws-lambda/lambda.zip --function-name udonarium-backend",
+    "deploy": "run-s build zip update"
+  },
+  "dependencies": {
+    "@udonarium-backend/core": "^1.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.4",
+    "tsx": "^4.7.1",
+    "npm-run-all2": "^6.2.0"
+  }
+}

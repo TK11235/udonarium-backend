@@ -1,0 +1,16 @@
+{
+  "name": "@udonarium-backend/core",
+  "version": "1.0.0",
+  "license": "MIT",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": {
+    "compile": "tsc"
+  },
+  "dependencies": {
+    "@skyway-sdk/token": "^1.6.2"
+  },
+  "devDependencies": {
+    "wrangler": "^3.57.2"
+  }
+}
