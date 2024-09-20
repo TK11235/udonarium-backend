@@ -54,18 +54,18 @@ export function routing(app: Hono) {
 
     try {
       param = await c.req.json<TokenRequestParam>();
+      const token = await SkyWayAuthToken.create(
+        `${SKYWAY_APP_ID}`,
+        `${SKYWAY_SECRET}`,
+        SKYWAY_UDONARIUM_LOBBY_SIZE ?? 3,
+        `${param.channelName}`,
+        `${param.peerId}`
+      );
+
+      return c.json({ token: token });
     } catch {
       return c.text('Bad Request', 400);
     }
-
-    const token = await SkyWayAuthToken.create(
-      `${SKYWAY_APP_ID}`,
-      `${SKYWAY_SECRET}`,
-      SKYWAY_UDONARIUM_LOBBY_SIZE ?? 3,
-      `${param.channelName}`,
-      `${param.peerId}`);
-
-    return c.json({ token: token });
   });
 
   return app;
