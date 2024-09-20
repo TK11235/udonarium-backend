@@ -34,12 +34,6 @@ export namespace SkyWayAuthToken {
         {
           name: peerId,
           actions: ['write'],
-          publication: {
-            actions: [],
-          },
-          subscription: {
-            actions: [],
-          },
         },
       ],
     });
@@ -62,12 +56,6 @@ export namespace SkyWayAuthToken {
         {
           name: '*',
           actions: ['signal'],
-          publication: {
-            actions: [],
-          },
-          subscription: {
-            actions: [],
-          },
         },
       ],
     });
