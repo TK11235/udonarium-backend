@@ -1,27 +1,41 @@
-import { Hono } from 'hono';
-import { env } from 'hono/adapter';
-import { SkyWayAuthToken } from './skyway2023/skyway-auth-token';
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { env } from "hono/adapter";
+import { HTTPException } from "hono/http-exception";
+import { z } from "zod";
+import { zValidator } from "@hono/zod-validator";
+import { SkyWayAuthToken } from "./skyway2023/skyway-auth-token";
 
-interface TokenRequestParam {
-  formatVersion: number;
-  channelName: string;
-  peerId: string;
-}
+const schema = z.object({
+  formatVersion: z.number().int().min(1).max(1), // Fixed to 1
+  channelName: z.string(),
+  peerId: z.string(),
+});
 
 export function routing(app: Hono) {
-  // Middleware
+  // CORS Middleware
   app.use(async (c, next) => {
-    const { ACCESS_CONTROL_ALLOW_ORIGIN } = env<{ ACCESS_CONTROL_ALLOW_ORIGIN: string[] | string }>(c);
-    const requestOrigin = c.req.header('Origin') ?? '';
+    const REQUEST_ORIGIN = c.req.header("Origin");
 
-    if (!isAllowedOrigin(requestOrigin, ACCESS_CONTROL_ALLOW_ORIGIN)) {
-      c.res = new Response('Forbidden', { status: 403, headers: new Headers({ 'Access-Control-Allow-Origin': requestOrigin }) });
-      return;
+    const { ACCESS_CONTROL_ALLOW_ORIGIN } = env<{
+      ACCESS_CONTROL_ALLOW_ORIGIN: string[] | string;
+    }>(c);
+
+    if (REQUEST_ORIGIN == undefined || REQUEST_ORIGIN === "") {
+      throw new HTTPException(400, { message: "Origin is required." });
     }
 
-    await next();
+    if (!isAllowedOrigin(REQUEST_ORIGIN, ACCESS_CONTROL_ALLOW_ORIGIN)) {
+      throw new HTTPException(403, { message: "Forbidden." });
+    }
 
-    c.res.headers.set('Access-Control-Allow-Origin', requestOrigin);
+    const corsMiddlewareHandler = cors({
+      origin: [REQUEST_ORIGIN],
+      allowHeaders: ["Content-Type", "Accept"],
+      allowMethods: ["POST", "GET", "OPTIONS"],
+    });
+
+    return corsMiddlewareHandler(c, next);
   });
 
   // Routing
@@ -30,43 +44,42 @@ export function routing(app: Hono) {
   });
 
   // Routing
-  app.post('/v1/skyway2023/token', async (c) => {
-    const {
-      SKYWAY_APP_ID,
-      SKYWAY_SECRET,
-      SKYWAY_UDONARIUM_LOBBY_SIZE
-    } = env<{
-      ENVIRONMENT: string,
-      SKYWAY_APP_ID: string,
-      SKYWAY_SECRET: string,
-      SKYWAY_UDONARIUM_LOBBY_SIZE: number
-    }>(c);
+  app.post(
+    '/v1/skyway2023/token',
+    zValidator("json", schema, (result, c) => {
+      if (!result.success) {
+        throw new HTTPException(400, { message: "Bad Request." });
+      }
+    }),
+    async (c) => {
+      const {
+        SKYWAY_APP_ID,
+        SKYWAY_SECRET,
+        SKYWAY_UDONARIUM_LOBBY_SIZE
+      } = env<{
+        ENVIRONMENT: string,
+        SKYWAY_APP_ID: string,
+        SKYWAY_SECRET: string,
+        SKYWAY_UDONARIUM_LOBBY_SIZE: number
+      }>(c);
 
-    if (!SKYWAY_APP_ID || !SKYWAY_SECRET) {
-      return c.text('Bad Request', 400);
+      if (!SKYWAY_APP_ID || !SKYWAY_SECRET) {
+        throw new HTTPException(500, { message: "Internal Server Error." });
+      }
+
+      const data = c.req.valid("json");
+
+      const token = await SkyWayAuthToken.create(
+        `${SKYWAY_APP_ID}`,
+        `${SKYWAY_SECRET}`,
+        SKYWAY_UDONARIUM_LOBBY_SIZE ?? 3,
+        `${data.channelName}`,
+        `${data.peerId}`
+      );
+
+      return c.json({ token }, 200);
     }
-
-    let param: TokenRequestParam = {
-      formatVersion: 1,
-      channelName: '',
-      peerId: '',
-    };
-
-    try {
-      param = await c.req.json<TokenRequestParam>();
-    } catch {
-      return c.text('Bad Request', 400);
-    }
-
-    const token = await SkyWayAuthToken.create(
-      `${SKYWAY_APP_ID}`,
-      `${SKYWAY_SECRET}`,
-      SKYWAY_UDONARIUM_LOBBY_SIZE ?? 3,
-      `${param.channelName}`,
-      `${param.peerId}`);
-
-    return c.json({ token: token });
-  });
+  );
 
   return app;
 }
