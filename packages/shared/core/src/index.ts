@@ -33,6 +33,7 @@ export function routing(app: Hono) {
       origin: [REQUEST_ORIGIN],
       allowHeaders: ["Content-Type", "Accept"],
       allowMethods: ["POST", "GET", "OPTIONS"],
+      maxAge: 86400,
     });
 
     return corsMiddlewareHandler(c, next);
@@ -104,7 +105,8 @@ async function parseRequestBody(c: Context): Promise<any> {
 }
 
 /**
- * Originの許可判定
+ * Originの許可判定: 完全修飾ドメインによる厳格な比較ではないので注意
+ * @example "https://example.com" と "https://example.com:8080" は同一Originとして扱われる
  *
  * @param requestOrigin リクエスト元のOrigin
  * @param allowedOrigins 許可するOrigin
@@ -114,11 +116,10 @@ function isAllowedOrigin(
   requestOrigin: string = "",
   allowedOrigins: string[] | string = ""
 ): boolean {
-  const canonicalOrigin = `${requestOrigin}//`;
-  const origins =
-    typeof allowedOrigins === "string" ? [allowedOrigins] : allowedOrigins;
-  // 完全修飾ドメインによる厳格な比較ではないので注意
-  return !!origins.find(
-    (origin) => origin == "*" || canonicalOrigin.startsWith(`${origin}/`)
+  const origins = Array.isArray(allowedOrigins)
+    ? allowedOrigins
+    : [allowedOrigins];
+  return origins.some(
+    (origin) => origin === "*" || requestOrigin.startsWith(`${origin}/`)
   );
 }
