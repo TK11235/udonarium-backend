@@ -1,15 +1,15 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { cors } from "hono/cors";
 import { env } from "hono/adapter";
 import { HTTPException } from "hono/http-exception";
-import { z } from "zod";
-import { zValidator } from "@hono/zod-validator";
+import { object, pipe, number, value, string, safeParse } from "valibot";
 import { SkyWayAuthToken } from "./skyway2023/skyway-auth-token";
 
-const schema = z.object({
-  formatVersion: z.number().int().min(1).max(1), // Fixed to 1
-  channelName: z.string(),
-  peerId: z.string(),
+const schema = object({
+  formatVersion: pipe(number(), value(1)),
+  channelName: string(),
+  peerId: string(),
 });
 
 export function routing(app: Hono) {
@@ -39,54 +39,86 @@ export function routing(app: Hono) {
   });
 
   // Routing
-  app.get('/v1/status', (c) => {
-    return c.text('OK');
+  app.get("/v1/status", (c) => {
+    return c.text("OK");
   });
 
   // Routing
-  app.post(
-    '/v1/skyway2023/token',
-    zValidator("json", schema, (result, c) => {
-      if (!result.success) {
-        throw new HTTPException(400, { message: "Bad Request." });
-      }
-    }),
-    async (c) => {
-      const {
-        SKYWAY_APP_ID,
-        SKYWAY_SECRET,
-        SKYWAY_UDONARIUM_LOBBY_SIZE
-      } = env<{
-        ENVIRONMENT: string,
-        SKYWAY_APP_ID: string,
-        SKYWAY_SECRET: string,
-        SKYWAY_UDONARIUM_LOBBY_SIZE: number
-      }>(c);
+  app.post("/v1/skyway2023/token", async (c) => {
+    const { SKYWAY_APP_ID, SKYWAY_SECRET, SKYWAY_UDONARIUM_LOBBY_SIZE } = env<{
+      ENVIRONMENT: string;
+      SKYWAY_APP_ID: string;
+      SKYWAY_SECRET: string;
+      SKYWAY_UDONARIUM_LOBBY_SIZE: number;
+    }>(c);
 
-      if (!SKYWAY_APP_ID || !SKYWAY_SECRET) {
-        throw new HTTPException(500, { message: "Internal Server Error." });
-      }
-
-      const data = c.req.valid("json");
-
-      const token = await SkyWayAuthToken.create(
-        `${SKYWAY_APP_ID}`,
-        `${SKYWAY_SECRET}`,
-        SKYWAY_UDONARIUM_LOBBY_SIZE ?? 3,
-        `${data.channelName}`,
-        `${data.peerId}`
-      );
-
-      return c.json({ token }, 200);
+    if (!SKYWAY_APP_ID || !SKYWAY_SECRET) {
+      throw new HTTPException(500, { message: "Internal Server Error." });
     }
-  );
+
+    const data = await parseRequestBody(c);
+
+    const validationResult = safeParse(schema, data);
+    if (!validationResult.success) {
+      throw new HTTPException(400, { message: "Bad Request." });
+    }
+
+    const token = await SkyWayAuthToken.create(
+      `${SKYWAY_APP_ID}`,
+      `${SKYWAY_SECRET}`,
+      SKYWAY_UDONARIUM_LOBBY_SIZE ?? 3,
+      `${data.channelName}`,
+      `${data.peerId}`
+    );
+
+    return c.json({ token }, 200);
+  });
 
   return app;
 }
 
-function isAllowedOrigin(requestOrigin: string = '', allowedOrigins: string[] | string = ''): boolean {
+/**
+ * 複数のContent-Typeに対応したリクエストボディのパース
+ *
+ * @param c Context
+ * @returns 複数のContent-Typeに対応したリクエストボディ
+ * @throws HTTPException
+ */
+async function parseRequestBody(c: Context): Promise<any> {
+  const contentType = c.req.header("Content-Type") || "";
+
+  const DATA_MAP: { [key: string]: () => Promise<any> } = {
+    "application/json": async () => await c.req.json(),
+    "application/x-www-form-urlencoded": async () => await c.req.parseBody(),
+    "text/plain": async () => JSON.parse(await c.req.text()),
+  };
+  const dataParser = Object.keys(DATA_MAP).find((key) =>
+    contentType.includes(key)
+  );
+
+  if (dataParser) {
+    return await DATA_MAP[dataParser]();
+  }
+
+  throw new HTTPException(415, { message: "Unsupported Media Type." });
+}
+
+/**
+ * Originの許可判定
+ *
+ * @param requestOrigin リクエスト元のOrigin
+ * @param allowedOrigins 許可するOrigin
+ * @returns 許可されている場合はtrue
+ */
+function isAllowedOrigin(
+  requestOrigin: string = "",
+  allowedOrigins: string[] | string = ""
+): boolean {
   const canonicalOrigin = `${requestOrigin}//`;
-  const origins = typeof allowedOrigins === 'string' ? [allowedOrigins] : allowedOrigins;
+  const origins =
+    typeof allowedOrigins === "string" ? [allowedOrigins] : allowedOrigins;
   // 完全修飾ドメインによる厳格な比較ではないので注意
-  return !!origins.find(origin => origin == '*' || canonicalOrigin.startsWith(`${origin}/`));
+  return !!origins.find(
+    (origin) => origin == "*" || canonicalOrigin.startsWith(`${origin}/`)
+  );
 }
