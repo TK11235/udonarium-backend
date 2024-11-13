@@ -8,9 +8,8 @@
     "compile": "tsc"
   },
   "dependencies": {
-    "@hono/zod-validator": "^0.3.0",
     "@skyway-sdk/token": "^1.6.2",
-    "zod": "^3.23.8"
+    "valibot": "^0.42.1"
   },
   "devDependencies": {
     "wrangler": "^3.57.2"
